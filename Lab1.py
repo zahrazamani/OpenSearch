@@ -16,3 +16,72 @@
 
 ###Lexical search is often the starting point for more advanced search techniques, such as phrase matching, fuzzy search, or relevance-based ranking. Leveraging lexical search can be particularly effective in scenarios where precision is critical, such as e-commerce product searches or legal document retrieval.
 
+#Step 1: Index sample data using web application for Lexical search: reindex is done on the app but this is the code behind it. It loads everything from the YAML file.
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
+#Opensearch client object
+aos_client = OpenSearch(
+    hosts = [{'host': <OpenSearchDomainEndpoint>, 'port': 443}],
+    http_auth = <OpenSearch master credentials>,
+    use_ssl = True,
+    connection_class = RequestsHttpConnection
+        )
+#Load the dataset
+items_ = yaml.load(open('/home/ec2-user/SageMaker/images_retail/products.yaml'))
+batch = 0
+count = 0
+body_ = ''
+batch_size = 50 # Bulk size
+action = json.dumps({ 'index': { '_index': 'demostore-search-index' } })
+#Iterating through the dataset
+for item in items_: 
+    count+=1
+
+    # building the document json
+    payload = {}
+    payload['image_url'] = fileshort
+    payload['product_description'] = item['description']
+    payload['caption'] = item['name']
+    payload['category'] = item['category']
+    payload['price'] = item['price']
+    payload['gender_affinity'] = payload['gender_affinity']
+    payload['style'] = item['style']
+
+    # Building the index request payload
+    body_ = body_ + action + "\n" + json.dumps(payload) + "\n"
+
+    # Calling bulk api when the batch size is met
+    if(count == batch_size):
+        response = aos_client.bulk(
+        index = 'demostore-search-index',
+        body = body_
+        )
+        batch += 1
+        count = 0
+        body_ = ""
+            
+#Step 2: Validate the created index using Dev tools in OpenSearch Dashboard: Check everything in cloudFoundation. These are the codes to check: 
+
+GET demostore-search-index
+
+
+GET demostore-search-index/_count
+
+
+GET demostore-search-index/_search
+{"query": {
+    "match_all": {}
+  },
+  "size": 1
+}
+
+GET demostore-search-index/_search
+{
+  "query": {
+    "match": {
+      "product_description": "black jacket for men"
+    }
+  },
+  "size": 5
+}
+#Step 3: Run lexical search in Dev Tools in OpenSearch Dashboard
+#Step 4: Run lexical search in Web application
