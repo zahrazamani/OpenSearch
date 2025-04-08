@@ -1,0 +1,85 @@
+Large Language Models (LLMs) play a crucial role in enhancing search relevance by transforming user queries into more effective inputs for search systems. Beyond simple rephrasing, LLMs can intelligently process queries to extract meaningful filters based on document attributes and generate descriptive captions for image-based searches.
+
+By analysing a query, LLMs can identify key attributes—such as category, price range, or geographic location—and automatically extract structured filters to refine search results. This helps in narrowing down the results and delivering more relevant information tailored to user needs. As an example in ecommerce search, for the below query, 'red sneakers for guys', structured filters such as color, category, style and gender can be extracted by LLM. Passing the re-written query with filters to the search engine, will retrieve more relevant results compared to the original query without filters.
+For image-based queries, LLMs can generate detailed captions that describe the content of an image in natural language. These captions can then be leveraged in lexical search, enabling text-based retrieval of relevant documents that align with the visual content. For example, one can retrieve similar items to below image from an ecommerce search store using the basic lexical search without adopting multimodal vector search.
+
+By adopting these two techniques separately or by combining attribute-based filter extraction, and image captioning, one can increase the lexical search quality with the help of LLMs across various domains.
+
+OpenSearch 2.16 introduced ml_inference search request processor to invoke any registered machine learning (ML) models in order to rewrite queries using the model output.
+
+In this lab, you will use ml_inference search request processor as a part of OpenSearch search pipeline to rewrite OpenSearch queries with extracted filters from LLM. You will use Anthropic Claude 3 Sonnet from Amazon Bedrock as the LLM.
+
+You will follow these steps to rewrite your search queries in OpenSearch Service:
+
+Step 1: Retrieve the connector id of the AI/ML connector created by the web application for the Anthropic Claude 3 Sonnet in Amazon Bedrock
+POST /_plugins/_ml/connectors/_search
+{"size":1,
+  "query": {
+    "match_phrase": {"name":"BEDROCK_Claude3_text: LLM"}
+  }
+}
+Step 2: Use the connector id to register and deploy the LLM
+POST _plugins/_ml/models/_register?deploy=true
+{
+  "name": "Amaozon Bedrock's Anthropic Claude Sonnet 3",
+  "function_name": "remote",
+  "description": "LLM to extract filters",
+  "connector_id": "<connector_id>"
+}
+Step 3: Test the model:Now let's test the deployed LLM with sample input using predict api. Copy and run the following code in Dev Tools to test the model, 
+replace the <model_id> with the actual model_id from the previous step.
+
+POST /_plugins/_ml/models/<model_id>/_predict
+{
+  "parameters": {
+    "inputs": "sneakers for guys"
+  }
+}
+As you see above, the LLM has classified sneakers for guys as male footwear category. Now you need to have the model predict such categories for any incoming queries and pass the categories as query filters. To do this automatically, you need to create a search pipeline with ml_inference request processor.
+
+
+Step 4: Create a search pipeline using the ml_inference request processor
+The following search pipeline intercepts the search query and performs the following in sequence,
+
+Reads the query string from the input query by following the path given in the inputs under input_map. You need to change this path based on the final query you use.
+Pass the query string to Claude LLM and invokes the model with the prompt (from connector definition in step 1)
+Stores the output of the model in the query path under output_map. You need to change this path based on the final query you use.
+PUT /_search/pipeline/LLM_search_request_pipeline
+{
+  "description": "Generate filters for queries through LLM",
+  "request_processors": [
+    {
+        "ml_inference": {
+        "model_id": "<model_id>",
+        "input_map": [
+          {
+            "inputs": "query.bool.must[0].match.product_description.query"
+          }
+        ],
+        "output_map": [
+          {
+            "query.bool.should[0].multi_match.query": "response"
+          }
+        ]
+      }
+    }
+  ]
+}
+Step 5: Test the search pipeline
+GET demostore-search-index/_search?search_pipeline=LLM_search_request_pipeline
+{
+  "query": {
+    "bool":{
+      "must":[{"match": {"product_description": {"query":"black jackets for men"}}}],
+      "should":[{
+        "multi_match":{"query":"response",
+        "type": "cross_fields",
+        "fields": ["gender_affinity", "category"],
+        "operator": "and"
+        }
+    }]
+  }
+ }
+}
+Step 6: Experiment with query re-write on the web application
+
