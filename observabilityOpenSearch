@@ -1,0 +1,26 @@
+Applications are becoming increasingly distributed, complex, with a lot of interconnected parts that are constantly updated. Any given change can create a previously unknown type of failure. Monitoring resource usage and status of underlying networking are simply not enough. It becomes imperative to not only understand what is happening but also rectify any potential issues. Observability provides a systematic way to understand the behavior of these complex systems. It allows developers and operators to characterize behavior by observing external outputs of a system. It drives fast innovation and high reliability of complex systems.
+
+Effective observability is not possible without building a foundation of reliable consistent instrumentation through high quality telemetry. And building such a telemetry that is vendor neutral, easy and universal is a hard engineering problem. Efforts like OpenTelemetry  and AWS Distro for OpenTelemetry  attempt to solve this exact problem. Telemetry data includes logs, metrics, and traces. Log analytics and trace analytics provide methodologies that help to identify the cause of behavior from a unusual observation in order to rectify them in a very short time. Amazon OpenSearch Service  has a proven record with log analytics with high scalability, flexibility, and security.
+
+Today we will explore observability  in Amazon OpenSearch Service by building a Sample App o11y Shop that publishes its logs and traces to Amazon OpenSearch Service. At the end of the session you will get familiar with the trace analytics feature of OpenSearch Service and how to use it in your operational analytics functions. Refer to the diagram for architecture of the solution we will be building today.
+
+What is observability and why should you care? When we say observability we mean trying to understand the internal system state via measuring data available to the outside. Typically, we do this to be able to act upon it.
+
+Before we get to a more formal definition of observability, let’s review a few core concepts:
+
+System: Short for System Under Observation (SUO). This is the cloud native platform (and applications running on it) you care about and are responsible for.
+
+Signals: Information observable from the outside of a system. There are different signal types (most common ones are logs, metrics, and traces) and they originate at sources.
+
+Sources: Are part of the infrastructure and application layer such as a microservice, a device, or the operating system. They typically have to be instrumented to emit signals.
+
+Agents: Responsible for signal collection and routing.
+
+Destinations: Where you consume signals, for different reasons and use cases, it includes visualizations (dashboards for example), alerting, long term storage (for regulatory purposes), analytics (finding new usages for an app).
+
+Telemetry: The process of collecting signals from sources, routing/pre-processing via agents, and ingestion to destinations.
+
+Observability in this sense represents, in essence, a feedback loop. A human user might, for example, restart a service based on the gathered information. In the case of an app, this could be a cluster autoscaler that adds worker nodes based on the system utilization measured.
+
+
+
