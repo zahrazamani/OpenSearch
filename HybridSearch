@@ -1,0 +1,65 @@
+Hybrid search is a technique that allows you to combine different types of search capabilities within a single search query. For instance, while lexical search and semantic search have their own strengths, combining the two search types improves the quality of search results.
+
+Step 1: Create a search pipeline using the normalization-processor
+The following search pipeline normalize the subqueries scores using min_maxtechnique and after combining the scores using arithmetic_mean, it provides equal weightage to each subquery.
+PUT _search/pipeline/hybrid_search_pipeline
+{
+  "description": "Post processor for hybrid search",
+  "phase_results_processors": [
+    {
+      "normalization-processor": {
+        "normalization": {
+          "technique": "min_max"
+        },
+        "combination": {
+          "technique": "arithmetic_mean",
+          "parameters": {
+            "weights": [
+              0.5,
+              0.5
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
+
+Step 2: Create a hybrid query in Dev Tools
+Hybrid search combines different search types like lexical search and neural search to improve search relevance. In the query below, you will run a hybrid search using lexical subquery and neural semantic subquery. The search pipeline created in Step 1 will provide more weight to the neural query than the lexical search subquery.
+
+GET demostore-search-index/_search?search_pipeline=hybrid_search_pipeline
+{
+  "_source": {
+    "exclude": [
+      "product_description_vector",
+      "product_multimodal_vector",
+      "product_image"
+    ]
+  },
+  "query": {
+    "hybrid": {
+      "queries": [
+        {
+          "match": {
+            "description": {
+              "query": "silver bracelets for men"
+            }
+          }
+        },
+        {
+          "neural": {
+            "product_description_vector": {
+              "query_text": "silver bracelets for men",
+              "model_id": "<model_id>",
+              "k": 5
+            }
+          }
+        }
+      ]
+    }
+  },
+  "size": 5
+}
+Step 3: Experiment with hybrid search on the web application
+
