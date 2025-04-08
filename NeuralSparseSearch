@@ -77,9 +77,84 @@ Step 4: Recreate the index with rank_features type field to store the sparse vec
 The neural sparse search is enabled with the native Lucene index in OpenSearch instead of the KNN index. To use the neural sparse search, you store the sparse encoding embedding in a field of type rank_features.
 
 In order to run the different ML search types covered in previous labs including Semantic and multimodal search, you will update the previously created KNN index to store the sparse encoding vectors. To do this, you will delete the existing index and create a new index.
-
+DELETE demostore-search-index
+PUT demostore-search-index
+{
+  "settings": {
+    "index.knn": true,
+    "default_pipeline": "ml_ingest_pipeline"
+  },
+  "mappings": {
+    "_source": {
+      "excludes": [
+        "product_image"
+      ]
+    },
+    "properties": {
+      "image_url": {
+        "type": "text"
+      },
+      "product_description": {
+        "type": "text"
+      },
+      "product_description_vector": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "engine": "faiss",
+          "space_type": "l2",
+          "name": "hnsw",
+          "parameters": {}
+        }
+      },
+      "product_multimodal_vector": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "engine": "faiss",
+          "space_type": "l2",
+          "name": "hnsw",
+          "parameters": {}
+        }
+      },
+      "product_image": {
+        "type": "binary"
+      },
+      "product_description_sparse_vector": {
+        "type": "rank_features"
+      }
+    }
+  }
+}
 
 Step 5: Reindex data in the newly created index using the web application
 Step 6: Create the search pipeline with neural_sparse_two_phase_processor
+When you perform neural sparse search in bi-encoder mode, the query is expanded with synonymns at the search time in addition to document expansion during the ingestion. Adding numerous similar tokens to each query token will increase the computational load and also add unnecessary noise while searching across document posting lists (inverted index structure of document token to document IDs). In order to avoid this, OpenSearch 2.15 introduced a new request processor: neural_sparse_two_phase_processor. Read more about this feature in Introducing the neural sparse two-phase algorithm  blog.
+
+This processor when added to a search pipeline, splits the neural sparse query terms into two categories:
+
+High-scoring tokens that are more relevant to the search.
+Low-scoring tokens that are less relevant.
+Adding this pipeline will make neural sparse search work in 2 phases,
+
+Phase 1: Selection of documents using the high-scoring tokens.
+Phase 2: Re-calculation of scores for those documents by including both high- and low-scoring tokens. This process significantly reduces computational load while maintaining the quality of the final ranking.
+A crucial parameter of this pipeline is prune_ratio which decides how to distinguish low and high scoring tokens. It's value ranges between 0 and 1 with default value of 0.4. The maximum token's score is multiplied by the prune_ratio to form the threshold value above which all tokens are considered as high scoring tokens. For example, the query given at the top of this page, "will husbandary lead to global warming", has the token husbandary with the highest weight 0.976. With the default prune_ratio 0.4, the threshold will be 0.4 * 0.976 which is 0.39. So, all tokens with weight > 0.39 will be high scoring tokens and the rest will be low scoring tokens.
+
+PUT /_search/pipeline/neural_sparse_two_phase_search_pipeline
+{
+  "request_processors": [
+    {
+      "neural_sparse_two_phase_processor": {
+        "tag": "neural-sparse",
+        "description": "This processor is making two-phase processor.",
+        "enabled": true,
+        "two_phase_parameter": {
+          "prune_ratio": 0.4
+        }
+      }
+    }
+  ]
+}
 Step 7: Experiment with neural sparse search on the web application
 Step 8 (Optional): Run neural sparse search in Dev Tools in OpenSearch Dashboard
