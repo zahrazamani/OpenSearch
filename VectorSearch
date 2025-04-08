@@ -1,0 +1,46 @@
+Vector search is a type of similarity search that allows you to find documents or data points that are similar to a given input vector. In OpenSearch, vector search is implemented using the KNN (K-Nearest Neighbors) algorithm.
+
+The main idea behind vector search is that you can represent data (like text, images, or other types of data) as high-dimensional vectors. These vectors capture the semantic meaning and relationships within the data.
+
+KNN plugin  in OpenSearch Service supports exact k-nearest neighbors (KNN) and approximate nearest neighbo(ANN) to find the most similar vectors to a given input vector. While KNN is sufficient for small workloads, ANN is best in case of large vector workloads with high dimensionality.
+
+Opensearch Service supports nmslib , faiss  and Lucene  libraries to run ANN search. In OpenSearch each of these libraries supports a similarity algorithm that you can leverage to index your data: Hierarchical Navigable Small Worlds algorithm (HNSW) and Inverted File System (IVF).
+
+HNSW and IVF represent two distinct approaches to approximate nearest neighbor (ANN) search in OpenSearch. HNSW builds a hierarchy of graphs, with each layer containing a subset of the vectors from the layer below, allowing it to efficiently traverse the graph and identify the approximate nearest neighbors to a query vector without the need for training. In contrast, IVF organizes the index vectors into buckets, with each bucket assigned a representative vector determined through a training step using k-Means clustering. This ensures that similar vectors are placed in the same or nearby buckets, allowing the search to be limited to only a subset of the buckets, reducing the overall search time. While HNSW does not require a training step, IVF's use of representative vectors and bucketing can provide a more sophisticated approximation of nearest neighbors, making it a valuable alternative approach in certain use cases.
+
+In lab2 of this workshop, you will use Approximate KNN with HNSW and faiss library to run each of the ML search types: Semantic search, multimodal search, neural sparse search and hybrid search.
+
+Semantic search is an advanced search technique that aims to understand the intent and contextual meaning behind a user's query, rather than simply matching keywords. By leveraging techniques such as natural language processing and knowledge graphs, semantic search engines can provide more relevant, meaningful results that better address the user's underlying information need. In this section you will learn how to build semantic search using OpenSearch Service.
+
+In order to build semantic search with OpenSearch Service, you will be using neural search plugin and KNN similarity search capabilities. Neural search transforms text into vectors using a text embedding model that you configure and facilitates vector search both at ingestion time and at search time. During ingestion, neural search transforms document text into vector embeddings and indexes both the text and its vector embeddings in a vector index. When you use a neural query during search, neural search converts the query text into vector embeddings, uses vector search to compare the query and document embeddings, and returns the closest results.
+
+For the text embedding model in Amazon Bedrock, you will be using Cohere's Embed English embedding model 
+
+You will follow these steps to build semantic search with OpenSearch and Bedrock:
+
+Step 1: Retrieve the connector id of the AI/ML connector created by the web application for Cohere's Embed English model in Amazon Bedrock: OpenSearch dashboard. 
+Web application has already created AI/ML connector for Cohere's Embed English model in Amazon Bedrock. In this step, you will retrieve the connector id of the model.
+
+POST /_plugins/_ml/connectors/_search
+{ "size":1,
+  "query": {
+    "match_phrase": {"name": "BEDROCK_TEXT_COHERE:EMBEDDING"}
+  }
+}
+Step 2: Use the connector id to register and deploy the embedding model
+
+Now, you will register the text embedding model and deploy it in OpenSearch Service.
+POST _plugins/_ml/models/_register?deploy=true
+{
+  "name": "Bedrock Text Embedding",
+  "function_name": "remote",
+  "description": "Bedrock Text Embedding embeddings model",
+  "connector_id": "<connector_id>"
+}
+
+Step 3: Create an ingest pipeline to generate text embeddings from product description using embedding model
+Step 4: Recreate the index with a new knn_vector type field to store the vector embeddings for product description
+Step 5: Reindex data in the newly created k-NN index using the web application
+Step 6: Experiment with semantic search in the web application
+Step 7: Run semantic search in Dev Tools in OpenSearch Dashboard
+Step 8: Run semantic search by applying Filters
