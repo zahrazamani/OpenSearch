@@ -39,8 +39,105 @@ POST _plugins/_ml/models/_register?deploy=true
 }
 
 Step 3: Create an ingest pipeline to generate text embeddings from product description using embedding model
+
+To build semantic search, OpenSearch Service uses the text_embedding processor in the ingest pipeline to call Cohere's Embed English embedding model in Amazon Bedrock at ingestion time and convert the content of the text field to vector embedding.
+
+To add a text_embedding processor to the ingest pipeline, copy the following code and run it in a new line in Dev Tools. This is a one time operation that registers a text_embedding processor to the ingest pipeline. Going forward, for all future ingestion, the ingest pipeline will invoke this processor to create a vector embedding, and store it along with the document as a vector field.
+PUT _ingest/pipeline/ml_ingest_pipeline
+{
+  "description": "text embedding ingest pipeline",
+  "processors": [
+    {
+      "text_embedding": {
+        "model_id": "<model_id>",
+        "field_map": {
+          "product_description": "product_description_vector"
+        }
+      }
+    }
+  ]
+}
+Copy and run the following code in Dev Tools to simulate the ingest pipeline to generated text embeddings.
+POST _ingest/pipeline/ml_ingest_pipeline/_simulate?verbose
+{
+  "docs": [
+    {
+      "_source": {
+        "product_description": "black jacket for men"
+      }
+    }
+  ]
+}
+
 Step 4: Recreate the index with a new knn_vector type field to store the vector embeddings for product description
+In order to run Approximate KNN search, you must create a KNN index to store the embedding vectors. In this step, you will delete the existing index and create a new KNN index.
+
+DELETE demostore-search-index
+PUT demostore-search-index
+{
+  "settings": {
+    "index.knn": true,
+    "default_pipeline": "ml_ingest_pipeline"
+  },
+  "mappings": {
+    "_source": {
+      "excludes": [
+        "product_image"
+      ]
+    },
+    "properties": {
+      "image_url": {
+        "type": "text"
+      },
+      "product_description": {
+        "type": "text"
+      },
+      "product_description_vector": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "engine": "faiss",
+          "space_type": "l2",
+          "name": "hnsw",
+          "parameters": {}
+        }
+      }
+    }
+  }
+}
 Step 5: Reindex data in the newly created k-NN index using the web application
 Step 6: Experiment with semantic search in the web application
 Step 7: Run semantic search in Dev Tools in OpenSearch Dashboard
+GET demostore-search-index/_search
+{
+  "query": {
+    "neural": {
+      "product_description_vector": {
+        "query_text": "silver bracelets for men",
+        "model_id": "<model_id>",
+        "k": 5
+      }
+    }
+  }
+}
+
 Step 8: Run semantic search by applying Filters
+GET demostore-search-index/_search
+{
+  "query": {
+    "neural": {
+      "product_description_vector": {
+        "query_text": "silver bracelets for men",
+        "model_id": "<model_id>",
+        "k": 5,
+        "filter": {
+          "bool":{
+            "must":[
+              {"term": {"gender_affinity.keyword": "Male"}}
+            ]
+          }
+        }
+      }
+    }
+  }
+}
