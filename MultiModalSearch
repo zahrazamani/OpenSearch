@@ -1,0 +1,107 @@
+Multimodal search enables both text and image search capabilities, transforming how users access data through search applications. You can enhance the users’ search experience with a visually appealing application that customers can use to not only search using text but they can also upload an image depicting a desired style and use the uploaded image alongside the input text in order to find the most relevant items for each user. Multimodal search provides more flexibility in deciding how to find the most relevant information for your search.
+
+To enable multimodal search across text, images, and combinations of the two, you generate embeddings for both text-based image metadata and the image itself. Text embeddings capture document semantics, while image embeddings capture visual attributes that help you build rich image search applications.
+
+Step 1: Retrieve the connector id of the AI/ML connector created by the web application for Titan Multimodal Embeddings G1 model hosted in Amazon Bedrock
+Web application has already created an AI/ML connector for Titan Multimodal Embeddings G1 model to invoke the Titan text and image embedding model in Amazon Bedrock. In this step, you will retrieve the connector id of that OpenSearch AI/ML connector.
+POST /_plugins/_ml/connectors/_search
+{ "size":1,
+  "query": {
+    "match": {"name": "BEDROCK_MULTIMODAL:EMBEDDING"}
+  }
+}
+
+Step 2: Use the connector id to register and deploy the embedding model
+POST _plugins/_ml/models/_register?deploy=true
+{
+  "name": "Bedrock text and image embeddings",
+  "function_name": "remote",
+  "description": "Bedrock Titan Multimodal Embedding embeddings model",
+  "connector_id": "<connector_id>"
+}
+
+Step 3: Update the ingest pipeline to generate embeddings from product description text and product images using multimodal embedding model
+
+In multimodal search, you need to use the text_image_embedding processor in the ingest pipeline to call Titan Multimodal Embeddings G1 embedding model and generate multimodal embeddings from the content of both fields product_description and product_image, and store the embeddings in the field product_multimodal_vector.
+
+In this step, you will update the ingest pipeline created in the previous lab Semantic search to include the multimodal text and image processor. This way, you only need to manage one ingest pipeline per index.
+
+PUT _ingest/pipeline/ml_ingest_pipeline
+{
+  "description": "ML ingest pipeline",
+  "processors": [
+    {
+      "text_embedding": {
+        "model_id": "wX50E5YBtlhDq_bx4AEA",
+        "field_map": {
+          "product_description": "product_description_vector"
+        }
+      }
+    },
+    {
+      "text_image_embedding": {
+        "model_id": "0X5_E5YBtlhDq_bx3gFa",
+        "embedding": "product_multimodal_vector",
+        "field_map": {
+          "text": "product_description",
+          "image": "product_image"
+        }
+      }
+    }
+  ]
+}
+
+Step 4: Recreate the index with knn_vector type field to store the vector embeddings for product description and product image
+
+In order to multimodal search, you must create a KNN index to store the embedding vectors. In this step, you will delete the existing index and create a new KNN index to store embedding vectors for product description and product image.
+DELETE demostore-search-index
+PUT demostore-search-index
+{
+  "settings": {
+    "index.knn": true,
+    "default_pipeline": "ml_ingest_pipeline"
+  },
+  "mappings": {
+    "_source": {
+      "excludes": [
+        "product_image"
+      ]
+    },
+    "properties": {
+      "image_url": {
+        "type": "text"
+      },
+      "product_description": {
+        "type": "text"
+      },
+      "product_description_vector": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "engine": "faiss",
+          "space_type": "l2",
+          "name": "hnsw",
+          "parameters": {}
+        }
+      },
+      "product_multimodal_vector": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "engine": "faiss",
+          "space_type": "l2",
+          "name": "hnsw",
+          "parameters": {}
+        }
+      },
+      "product_image": {
+        "type": "binary"
+      }
+    }
+  }
+}
+
+Step 5: Reindex data in the newly created k-NN index using the web application
+
+Step 6: Experiment with multimodal search on the web application
+Step 7 (Optional): Run multimodal search in Dev Tools in OpenSearch Dashboard
