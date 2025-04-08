@@ -1,0 +1,37 @@
+What are we building? In this lab, you will build a "shopping assistant" chat bot that can handle natural language requests to find relevant products matching your end-users queries and answer follow-up questions. The shopping assistant will use conversational search in OpenSearch Service, which combines Retrieval-Augmented Generation (RAG) and conversational history to build and maintain context throughout the conversation.
+
+In the second part of the lab, you will augment the conversational search with an AI agent  to perform the RAG search when appropriate. This will allow the shopping assistant to respond appropriately to user requests like answer follow-up questions that requires looking into the conversation history or kick-off a new product search.
+
+Key concepts Retrieval-Augmented Generation (RAG) : Allows an LLM to supplement its static knowledge base with proprietary or current information. In this lab, you will use the product catalog as the data source for RAG. Conversation history : It maintains the history of the current conversation (question/answer) so the LLM can handle follow-up questions. Agents : An agent is a coordinator that uses a large language model (LLM) to solve a problem. After the LLM reasons and decides what action to take, the agent coordinates the action running plan.
+
+Why do you need agents? The agentic RAG is an advanced approach to augment your RAG solutions with intelligence. When your end users are interacting with RAG solutions, they may be running ad-hoc search queries looking for specific item from your product catalog. But in many cases, end users are looking for a rather conversational experience as if they are interacting with a human. The human shopping assistant, should be aware when to look for a new item ( run a new search query ), versus maintaining the history of the conversation and keep looking into the end user request without losing the overall context.
+
+When using a pipeline without agents, every end user query into the conversation will necessarily trigger a search and a response from the LLM. While this works well for the initial search and response, the user may have follow-up questions about the current set of returned search results that do not require a new search with the next question. This is where agents shine: allowing the LLM to reach for additional data only when the conversation requires it. This is only one aspect how agents can help improve your RAG solutions. You will learn more about the usage of agentic RAG in part 2 of this lab.
+
+Building steps This lab is composed of 2 parts. In part 1, you will build a multimodal conversational search using OpenSearch Service as the vector store. You will learn about out-of-the-box OpenSearch Service features that allow you to build multimodal conversational search.
+
+In part 2, you will dive deep into the agentic RAG experience. You will use OpenSearch Service as the vector store and you will learn how Amazon Bedrock agents  can interact with OpenSearch Service. After you complete part 1, you will be able to experiement with agentic RAG on the web application deployed in the 'Setup' phase at the beginning of the workshop.
+
+Part 1: Build multimodal conversational search with OpenSearch Service
+Part 2: Agentic shopping assistant
+
+Part 1: Build multimodal conversational search with OpenSearch Service
+Conversational search  Conversational search in OpenSearch Service allows you to ask questions in natural language and refine the answers by asking follow-up questions. Thus, the conversation becomes a dialog between you and a large language model (LLM). For this to happen, instead of answering each question individually, the model needs to remember the context of the entire conversation.
+
+To build conversational search with OpenSearch Service, you will be using the following features:
+
+Retrieval Augmented Generation (RAG) response processor : OpenSearch provides out-of-the-box RAG processor that intercepts OpenSearch query results, retrieves previous messages in the conversation from the conversation memory, and sends a prompt to the LLM. After the processor receives a response from the LLM, it saves the response in conversation history and returns both the original OpenSearch query results and the LLM response.
+Conversation history : OpenSearch Service saves the conversation history in a memory. The memory is composed of a list of messages that represent the user's question and LLM generated answer pair. This allows the LLM to remember the context of the current conversation and understand follow-up questions.
+Search pipelines : Allow you to use the RAG processor mentioned above and render the final response composed of the search query results and generated text from the LLM response.
+
+In this lab, you will use a Jupyter notebook to build the conversation search with OpenSearch Service and experiment with sample queries. The Jupyter notebook is automatically provisioned within the workshop.
+
+Make sure you complete all steps mentioned in the notebook:
+
+Get a few Python pre-requisites installed and libraries imported.
+Download the sample product catalog data set from S3 (items.txt), create a kNN-enabled index and ingest the catalog items into the index.
+Note: the data set is a product catalog derived from the Shopping Queries Data Set 
+Find connectors and register the various ML models we will be using (text and multimodal embedding models, large language model).
+Deploy the search pipeline.
+Experiment with conversational search.
+Export the model IDs deployed in this notebook for use in the web application.
