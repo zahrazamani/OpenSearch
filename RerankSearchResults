@@ -1,0 +1,162 @@
+In search systems, the ability to quickly find relevant and high-quality content is crucial. One way to enhance the search experience is through the use of reranking models.
+
+At the core of any search system is the concept of relevance - how well the returned results match the user's query and intent. Traditionally, search engine ranking algorithms like BM25 (Best Matching 25)  , rely on factors like keyword matching, term frequency, and document length. The BM25 formula combines these factors to compute a relevance score for each document in the search results. The BM25 score is then used to rerank the search results, with documents having a higher score being considered more relevant to the user's query.
+
+On the other hand, in vector search , relevancy is determined by the similarity between a query vector and the document vectors in the same vector space. This similarity is typically measured using a distance metric, such as cosine similarity and other techniques. Same as with BM25, the higher the cosine similarity between the query vector and a document vector, the more relevant the document is considered to be for the given query. Documents are then ranked based on their cosine similarity scores, with the most similar documents appearing higher in the search results.
+
+However, these ranking approaches like BM25 and similarity search have limitations in capturing the nuances of human language and information needs that requires deeper understanding of the content.
+
+To address these shortcomings, reranking models are often used in conjunction with traditional ranking approaches. Reranking models can leverage additional signals, such as machine learning-based relevance scoring, user behavior, and domain-specific knowledge, to better match search results to the user's intent and provide a more personalized and relevant search experience.
+What is re-ranking?
+Reranking is the process of adjusting the order of search results based on additional signals or machine learning models, going beyond the initial ranking provided by the search engine. This is where reranking models come into play.
+
+What are the approaches to re-rank results?
+OpenSearch Service supports integration with Learning to Rank  open-source plugin to rescore search results. This approach requires a training phase of the reranker model. Training the models requires labeled data, where human raters have provided relevance judgments for query-document pairs. This helps in use case where you need to tune the models fo your specific search domain and user needs.
+
+Another approach to rerank search results is by using Cross-encoder models  that can be used to directly score the relevance of a query-document pair wihtout training phase. The cross-encoder models take the full query and document as input, and output a relevance score based on their understanding of the semantic and contextual relationships.
+
+In this lab, you will learn how to use cross-encoders models with OpenSearch to rerank your search results.
+
+OpenSearch 2.12 added support for rerank processor  that runs at search time to rerank search results. You can use open-source cross-encoder models like huggingface/cross-encoders/ms-marco-MiniLM-L-6-v2 available in Hugging Face .
+
+The rerank processor in OpenSearch Service evaluates the search results from BM25 or similarity metric and sorts them based on the new scores provided by the cross-encoder model. The rerank search request processor intercepts search results and passes them to a cross-encoder model to be reranked. The model reranks the results, taking into account the scoring context. Then the processor orders documents in the search results based on their new scores.
+
+You will follow these steps to rerank your search results in OpenSearch Service:
+
+Step 1: Retrieve the connector id of the AI/ML connector created by the web application for the Cross Encoder model, ms-marco-MiniLM-L-6-v2 hosted in Amazon SageMaker
+Web application has already created an AI/ML connector for Cross Encoder model, ms-marco-MiniLM-L-6-v2 to invoke the model in Amazon SageMaker. In this step, you will retrieve the connector id of that OpenSearch AI/ML connector.
+
+
+POST /_plugins/_ml/connectors/_search
+{ "size":1,
+  "query": {
+    "match": {"name": "SAGEMAKER:RE-RANKING"}
+  }
+POST /_plugins/_ml/connectors/_search
+{ "size":1,
+  "query": {
+    "match": {"name": "SAGEMAKER:RE-RANKING"}
+  }
+}
+Step 2: Use the connector id to register and deploy the cross encoder model
+POST _plugins/_ml/models/_register?deploy=true
+{
+  "name": "Cross Encoder re-ranking",
+  "function_name": "remote",
+  "description": "SageMaker cross encoder model to re-rank the results",
+  "connector_id": "<connector_id>"
+}
+
+Step 3: Create a search pipeline using the rerank response processor
+The following search pipeline re-ranks the results from any search query using a cross-encoder that you already deployed in Amazon SageMaker. This search pipeline uses rerank response_processor that re-ranks the documents based on the document field, 'product_description'.
+PUT /_search/pipeline/sagemaker_rerank_pipeline
+{
+    "description": "Pipeline for reranking with Sagemaker cross-encoder model",
+    "response_processors": [
+        {
+            "rerank": {
+                "ml_opensearch": {
+                    "model_id": "your_model_id_created_in_step1"
+                },
+                "context": {
+                    "document_fields": ["product_description"]
+                }
+            }
+        }
+    ]
+}
+
+Step 4: Test the re-ranking search pipeline
+
+To perform a reranking search on your index, use any OpenSearch query and provide an additional ext.rerank field. In the query below, you will run a lexical search using a match query. You can also run any type of search as covered in the previous labs such as vector, multimodal or neural sparse search. The search pipeline created in the previous step 1 should be attached to the POST method as shown below.
+GET demostore-search-index/_search?search_pipeline=sagemaker_rerank_pipeline
+{
+  "query": {
+    "match": {
+      "product_description": "black jackets for men"
+    }
+  },
+  "ext": {
+    "rerank": {
+      "query_context": {
+         "query_text": "black jackets for men"
+      }
+    }
+  }
+}
+
+Step 5: Experiment by re-ranking the search results on the web application
+
+
+
+Amazon Bedrock  provides access to reranker models that you can use when querying to improve the relevance of the retrieved results. A reranker model calculates the relevance of chunks to a query and reorders the results based on the scores that it calculates. Rerank is supported for the following foundation models in Amazon Bedrock:
+
+Cohere Rerank 3.5
+Amazon Rerank 1.0
+These models offer advanced reranking functionality without the complexity of managing infrastructure or deploying models yourself. Using Bedrock for re-ranking provides significant advantages over deploying a SageMaker model:
+
+Simplified deployment: Make API calls to Bedrock without managing endpoints or infrastructure.
+Lower operational overhead: Bedrock handles scaling, updates, and model maintenance.
+Cost-effectiveness: Pay only for compute used during inference, avoiding ongoing endpoint maintenance costs.
+Faster implementation: Quickly integrate reranking without model training or tuning.
+Access to multiple models: Easily experiment with various reranking models to optimize your use case.
+Continuous improvements: Benefit from regular model updates and enhancements.
+In this lab, you will use Cohere rerank v3.5  model on Amazon Bedrock to rerank search results of OpenSearch service. Rerank 3.5 is Cohere's newest and most performant foundational model for ranking. Rerank 3.5 has a context length of 4096, SOTA (State of the Art) performance on Multilingual Retrieval tasks and Reasoning Capabilities.
+
+You will follow these steps to rerank your search results in OpenSearch Service using Cohere rerank v3.5 model on Amazon Bedrock:
+
+Step 1: Retrieve the connector id of the AI/ML connector for Cohere rerank v3.5 model in in Amazon Bedrock
+POST /_plugins/_ml/connectors/_search
+{ "size":1,
+  "query": {
+    "match_phrase": {"description": "BEDROCK_RERANK_COHERE"}
+  }
+}
+Step 2: Use the connector id to register and deploy the bedrock reranker model
+POST _plugins/_ml/models/_register?deploy=true
+{
+  "name": "Cohere rerank v3.5 on Bedrock",
+  "function_name": "remote",
+  "description": "Cohere rerank v3.5 on bedrock to re-rank the results",
+  "connector_id": "<connector_id>"
+}
+
+Step 3: Create a search pipeline using the rerank response processor
+The following search pipeline re-ranks the results from any search query using the Cohere rerank v3.5 model in Amazon Bedrock. This search pipeline uses rerank response_processor that re-ranks the documents based on the document field, 'product_description'.
+
+PUT /_search/pipeline/bedrock_rerank_pipeline
+{
+    "description": "Pipeline for reranking with bedrock Cohere rerank v3.5 model",
+    "response_processors": [
+        {
+            "rerank": {
+                "ml_opensearch": {
+                    "model_id": "your_model_id_created_in_step1"
+                },
+                "context": {
+                    "document_fields": ["product_description"]
+                }
+            }
+        }
+    ]
+}
+Step 4: Test the re-ranking search pipeline
+To perform a reranking search on your index, use any OpenSearch query and provide an additional ext.rerank field. In the query below, you will run a lexical search using a match query. You can also run any type of search as covered in the previous labs such as vector, multimodal or neural sparse search. The search pipeline created in the previous step 1 should be attached to the POST method as shown below.
+GET demostore-search-index/_search?search_pipeline=bedrock_rerank_pipeline
+{
+  "query": {
+    "match": {
+      "product_description": "black jackets for men"
+    }
+  },
+  "ext": {
+    "rerank": {
+      "query_context": {
+         "query_text": "black jackets for men"
+      }
+    }
+  }
+}
+
+Step 5: Experiment by re-ranking the search results on the web application
+
