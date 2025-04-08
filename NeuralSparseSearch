@@ -1,0 +1,85 @@
+When you use a dense vector embedding model to generate traditional dense vector embeddings, like in Semantic search section, the encoder model translates each word into a high-dimensional vector. These vectors collectively make up a semantic vector space, where words with similar meanings are represented by vectors that are close together.
+
+In contrast, sparse encoding uses the text to create a list of tokens that have similar semantic meaning. Every token will have a weightage that indicates how much the respective is relavant to the whole text document. The model's vocabulary, which can include common words as well as various affixes and morphemes, represents a semantic space where each document is encoded as a sparse vector. Below is an example of a sparse embedding (a list of token with weights) for a sample text document.
+
+Neural sparse search combines the benefits of sparse encoding with the advantages of neural networks to achieve high-quality semantic search. This approach offers several key advantages:
+
+More efficient data structures: Dense encodings require the use k-NN index type. In contrast, sparse encodings can leverage the native Lucene index, called "inverted index" used in traditional keyword-based search, as the sparse vectors are similar to standard term vectors.
+Reduced resource requirements: Sparse embeddings have a much smaller index size compared to dense embeddings. They also incur lower computational costs and memory usage, making them more resource-efficient.
+Improved performance on unfamiliar datasets: Dense encoders can struggle when applied to content outside of their training domain, often producing unpredictable embeddings that lead to poor search relevance. In contrast, Sparse encoders can leverage keyword-based matching as a fallback, ensuring their performance does not degrade as badly in these scenarios.
+
+Neural sparse search supports two modes of operation:
+
+Bi-encoder mode: Both the search queries and the documents are passed through sparse encoder model to generate sparse embeddings.
+Document-only mode: Only the documents are encoded using a sparse encoding mode, while search queries are tokenized at query time. This eliminates the online inference step for queries, significantly reducing latency while still preserving search quality.
+
+
+OpenSearch has developed 5 machine learning models to perform Neural Sparse search through the above modes. You can check the models in OpenSearch Hugging face repository . In this lab, you will be using the model, opensearch-neural-sparse-encoding-v2-distill which operates on a Bi-encoder mode. This model is already deployed on a SageMaker endpoint for you.
+
+You will be performing the following actions to build neural sparse search:
+
+Step 1: Retrieve the connector id of the AI/ML connector created by the web application for opensearch-neural-sparse-encoding-v2-distill model hosted in Amazon SageMaker
+The web application has already created an AI/ML connector for the sparse encoder model, opensearch-neural-sparse-encoding-v2-distill hosted in Amazon Sagemaker. In this step, you will retrieve the connector id of that OpenSearch-SageMaker AI/ML connector.
+
+POST /_plugins/_ml/connectors/_search
+{ "size":1,
+  "query": {
+    "match": {"name": "SAGEMAKER_SPARSE:EMBEDDING"}
+  }
+}
+Step 2: Use the connector id to register and deploy the embedding model
+POST _plugins/_ml/models/_register?deploy=true
+{
+  "name": "Neural sparse encoder model",
+  "function_name": "remote",
+  "description": "Sparse encoding model",
+  "connector_id": "<connector_id>"
+}
+
+Step 3: Update the ingest pipeline to generate sparse embeddings from product description text using the sparse encoding model
+To build neural sparse search, OpenSearch Service uses the sparse_encoding processor in the ingest pipeline to convert the text field to sparse vector embeddings.
+
+In this step, you will update the ingest pipeline created in the previous labs with Semantic search and Multimodal search to include the sparse encoding processor with the field product_description as source and store the sparse embeddings in the field product_description_sparse_vector.
+PUT _ingest/pipeline/ml_ingest_pipeline
+{
+  "description": "ML ingest pipeline",
+  "processors": [
+    {
+      "text_embedding": {
+        "model_id": "wX50E5YBtlhDq_bx4AEA",
+        "field_map": {
+          "product_description": "product_description_vector"
+        }
+      }
+    },
+    {
+      "text_image_embedding": {
+        "model_id": "0X5_E5YBtlhDq_bx3gFa",
+        "embedding": "product_multimodal_vector",
+        "field_map": {
+          "text": "product_description",
+          "image": "product_image"
+        }
+      }
+    },
+    {
+      "sparse_encoding": {
+        "model_id": "236GE5YBtlhDq_bxjQEB",
+        "field_map": {
+          "product_description": "product_description_sparse_vector"
+        }
+      }
+    }
+  ]
+}
+
+Step 4: Recreate the index with rank_features type field to store the sparse vector embeddings for product description
+The neural sparse search is enabled with the native Lucene index in OpenSearch instead of the KNN index. To use the neural sparse search, you store the sparse encoding embedding in a field of type rank_features.
+
+In order to run the different ML search types covered in previous labs including Semantic and multimodal search, you will update the previously created KNN index to store the sparse encoding vectors. To do this, you will delete the existing index and create a new index.
+
+
+Step 5: Reindex data in the newly created index using the web application
+Step 6: Create the search pipeline with neural_sparse_two_phase_processor
+Step 7: Experiment with neural sparse search on the web application
+Step 8 (Optional): Run neural sparse search in Dev Tools in OpenSearch Dashboard
